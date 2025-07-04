@@ -177,18 +177,6 @@ function App() {
     setDragOverId(null);
   };
 
-  const handleBlockClick = (rowIdx: number, colIdx: number) => {
-    if (!selectedHabit) return;
-    const key = `${rowIdx}-${colIdx}`;
-    setHabitStreaks(prev => {
-      const prevArr = prev[selectedHabit.id] || [];
-      const nextArr = prevArr.includes(key)
-        ? prevArr.filter(k => k !== key)
-        : [...prevArr, key];
-      return { ...prev, [selectedHabit.id]: nextArr };
-    });
-  };
-
   // Helper to get filledBlocks Set for selected habit
   const getFilledBlocksForSelected = () => {
     if (!selectedHabit) return new Set<string>();

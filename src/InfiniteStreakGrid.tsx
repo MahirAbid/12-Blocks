@@ -105,10 +105,6 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
             const blockKey = `${index}-${colIdx}`;
             // Only allow toggling if this is today and colIdx matches current hour
             const isUnlocked = isToday && colIdx === currentHour;
-            // For today, if the hour has passed, box is locked but should show as checked if it was checked
-            const isPastHourToday = isToday && colIdx < currentHour;
-            const isFutureHourToday = isToday && colIdx > currentHour;
-            const isLocked = !isUnlocked;
             const isChecked = filledBlocks.has(blockKey);
             return (
               <div
