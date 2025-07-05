@@ -74,7 +74,21 @@ function App() {
     const saved = localStorage.getItem('habitStreaks');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // MIGRATION: If the value is an array, convert to object with dummy timestamps
+        const migrated: Record<string, Record<string, number>> = {};
+        for (const habitId in parsed) {
+          const value = parsed[habitId];
+          if (Array.isArray(value)) {
+            migrated[habitId] = {};
+            for (const key of value) {
+              migrated[habitId][key] = Date.now(); // Use current time as fallback
+            }
+          } else if (typeof value === 'object' && value !== null) {
+            migrated[habitId] = value;
+          }
+        }
+        return migrated as Record<number, Record<string, number>>;
       } catch {
         return {};
       }
