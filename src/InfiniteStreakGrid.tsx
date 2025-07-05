@@ -2,6 +2,7 @@ import { useRef, useLayoutEffect, useCallback, useState, useEffect } from 'react
 import { VariableSizeList as List } from 'react-window';
 import './App.css';
 import { useState as useReactState } from 'react';
+import React from 'react';
 
 const NUM_COLS = 24; // Number of blocks per day (no label col)
 const BOX_SIZE = 40; // px
@@ -34,6 +35,17 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
   const [containerHeight, setContainerHeight] = useState(0);
   const [showScrollToToday, setShowScrollToToday] = useReactState(false);
 
+  // Debug mode state
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugTime, setDebugTime] = useState(() => {
+    const now = new Date();
+    return now.toISOString().slice(0, 16); // 'YYYY-MM-DDTHH:mm'
+  });
+  // Helper to get the current time (real or debug)
+  function getNow() {
+    return debugMode ? new Date(debugTime) : new Date();
+  }
+
   // Responsive: track container width and height
   useLayoutEffect(() => {
     function updateSize() {
@@ -55,29 +67,38 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
 
   // Render a row: date label above, then row of blocks
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const now = getNow();
     const cellDate = getDateForRow(index);
     const dateStr = cellDate.toLocaleDateString(undefined, { weekday: 'short', month: 'numeric', day: 'numeric', year: 'numeric' });
-    const today = new Date();
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
     const isToday = cellDate.getTime() === today.getTime();
-    const currentHour = new Date().getHours();
+    const currentHour = now.getHours();
     // Timer state for the current hour block
     const [timeLeft, setTimeLeft] = useReactState(() => {
       if (!isToday) return null;
-      const now = new Date();
       const msToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
       return msToNextHour;
     });
     // Update timer every second for the current hour block only
     useEffect(() => {
       if (!isToday) return;
+      if (debugMode) return; // Don't auto-update timer in debug mode
       const interval = setInterval(() => {
-        const now = new Date();
+        const now = getNow();
         const msToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
         setTimeLeft(msToNextHour);
       }, 1000);
       return () => clearInterval(interval);
-    }, [isToday, setTimeLeft]);
+    }, [isToday, setTimeLeft, debugMode, debugTime]);
+    useEffect(() => {
+      if (!isToday) return;
+      if (!debugMode) return;
+      // In debug mode, update timer when debugTime changes
+      const now = getNow();
+      const msToNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
+      setTimeLeft(msToNextHour);
+    }, [isToday, debugMode, debugTime]);
     function formatTime(ms: number | null) {
       if (ms == null) return '';
       const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -135,7 +156,7 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
                     if (next[blockKey]) {
                       delete next[blockKey];
                     } else {
-                      next[blockKey] = Date.now();
+                      next[blockKey] = getNow().getTime();
                     }
                     return next;
                   });
@@ -162,7 +183,7 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
         </div>
       </div>
     );
-  }, [filledBlocks, boxSize, rowWidth]);
+  }, [filledBlocks, boxSize, rowWidth, debugMode, debugTime]);
 
   const listRef = useRef<any>(null);
 
@@ -182,11 +203,37 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
     }
   }, []);
 
+  // Remove always-visible debug UI, and add keyboard shortcut to toggle debugMode
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+        setDebugMode(dm => !dm);
+        e.preventDefault();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div
       ref={containerRef}
-      style={{ width: '100%', height: '100%', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      style={{ width: '100%', height: '100%', flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
     >
+      {/* Debug UI only visible in debugMode */}
+      {debugMode && (
+        <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 20, background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 13, fontWeight: 500 }}>
+            Debug/Time Traveler
+          </label>
+          <input
+            type="datetime-local"
+            value={debugTime}
+            onChange={e => setDebugTime(e.target.value)}
+            style={{ fontSize: 13, padding: '2px 6px', borderRadius: 4, border: '1px solid #ccc' }}
+          />
+        </div>
+      )}
       {containerWidth > 0 && containerHeight > 0 && (
         <>
           <List
@@ -267,11 +314,11 @@ function getSaturationLevel(checkedAt: number | undefined, cellDate: Date, colId
   if (diffMs < 0 || diffMs > 60 * 60 * 1000) return 0; // checked outside the hour
   const diffMin = diffMs / 60000;
   if (diffMin <= 10) return 100;
-  if (diffMin <= 20) return 90;
-  if (diffMin <= 30) return 80;
-  if (diffMin <= 40) return 70;
-  if (diffMin <= 50) return 60;
-  return 50;
+  if (diffMin <= 20) return 80;
+  if (diffMin <= 30) return 60;
+  if (diffMin <= 40) return 40;
+  if (diffMin <= 50) return 20;
+  return 5;
 }
 
 export default InfiniteStreakGrid;
