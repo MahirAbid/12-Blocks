@@ -70,7 +70,7 @@ function App() {
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
   const [nameWarning, setNameWarning] = useState('');
   // Per-habit streaks
-  const [habitStreaks, setHabitStreaks] = useState<Record<number, string[]>>(() => {
+  const [habitStreaks, setHabitStreaks] = useState<Record<number, Record<string, number>>>(() => {
     const saved = localStorage.getItem('habitStreaks');
     if (saved) {
       try {
@@ -139,7 +139,7 @@ function App() {
     if (addInput.trim()) {
       const newId = Date.now();
       setHabits([...habits, { id: newId, name: addInput.trim() }]);
-      setHabitStreaks(prev => ({ ...prev, [newId]: [] }));
+      setHabitStreaks(prev => ({ ...prev, [newId]: {} }));
       setAddInput('');
       setShowAddModal(false);
     }
@@ -177,10 +177,10 @@ function App() {
     setDragOverId(null);
   };
 
-  // Helper to get filledBlocks Set for selected habit
+  // Helper to get filledBlocks object for selected habit
   const getFilledBlocksForSelected = () => {
-    if (!selectedHabit) return new Set<string>();
-    return new Set(habitStreaks[selectedHabit.id] || []);
+    if (!selectedHabit) return {};
+    return habitStreaks[selectedHabit.id] || {};
   };
 
   return (
@@ -395,13 +395,12 @@ function App() {
             <div className="streak-main-container streak-box-container" style={{ flex: 1, minHeight: 0, minWidth: 0, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: 0, overflow: 'hidden' }}>
               <InfiniteStreakGrid
                 filledBlocks={getFilledBlocksForSelected()}
-                setFilledBlocks={(setFn: (prev: Set<string>) => Set<string>) => {
+                setFilledBlocks={(setFn: (prev: Record<string, number>) => Record<string, number>) => {
                   if (!selectedHabit) return;
                   setHabitStreaks(prev => {
-                    const prevArr = prev[selectedHabit.id] || [];
-                    const prevSet = new Set(prevArr);
-                    const nextSet = setFn(prevSet);
-                    return { ...prev, [selectedHabit.id]: Array.from(nextSet) };
+                    const prevObj = prev[selectedHabit.id] || {};
+                    const nextObj = setFn(prevObj);
+                    return { ...prev, [selectedHabit.id]: nextObj };
                   });
                 }}
                 resetScrollKey={selectedHabit?.id}

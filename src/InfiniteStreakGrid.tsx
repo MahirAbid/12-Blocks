@@ -23,8 +23,8 @@ function getDateForRow(rowIndex: number): Date {
 }
 
 interface InfiniteStreakGridProps {
-  filledBlocks: Set<string>;
-  setFilledBlocks: (fn: (prev: Set<string>) => Set<string>) => void;
+  filledBlocks: Record<string, number>;
+  setFilledBlocks: (fn: (prev: Record<string, number>) => Record<string, number>) => void;
   resetScrollKey?: string | number;
 }
 
@@ -105,7 +105,7 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
             const blockKey = `${index}-${colIdx}`;
             // Only allow toggling if this is today and colIdx matches current hour
             const isUnlocked = isToday && colIdx === currentHour;
-            const isChecked = filledBlocks.has(blockKey);
+            const isChecked = filledBlocks[blockKey] !== undefined;
             return (
               <div
                 key={blockKey}
@@ -113,7 +113,7 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
                   width: boxSize,
                   height: boxSize,
                   background: isChecked
-                    ? CTA_COLOR
+                    ? `hsl(226, ${getSaturationLevel(filledBlocks[blockKey], cellDate, colIdx)}%, 60%)`
                     : (isUnlocked ? UNFILLED_COLOR : '#f3f4f8'),
                   border: `1px solid ${BORDER_COLOR}`,
                   borderRadius: 6,
@@ -131,8 +131,12 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
                 onClick={() => {
                   if (!isUnlocked) return;
                   setFilledBlocks(prev => {
-                    const next = new Set(prev);
-                    if (next.has(blockKey)) next.delete(blockKey); else next.add(blockKey);
+                    const next = { ...prev };
+                    if (next[blockKey]) {
+                      delete next[blockKey];
+                    } else {
+                      next[blockKey] = Date.now();
+                    }
                     return next;
                   });
                 }}
@@ -251,6 +255,23 @@ function InfiniteStreakGrid({ filledBlocks, setFilledBlocks, resetScrollKey }: I
       )}
     </div>
   );
+}
+
+// Color calculation for checked blocks
+function getSaturationLevel(checkedAt: number | undefined, cellDate: Date, colIdx: number) {
+  if (!checkedAt) return 0;
+  // cellDate is midnight of the day, colIdx is the hour
+  const blockStart = new Date(cellDate);
+  blockStart.setHours(colIdx, 0, 0, 0);
+  const diffMs = checkedAt - blockStart.getTime();
+  if (diffMs < 0 || diffMs > 60 * 60 * 1000) return 0; // checked outside the hour
+  const diffMin = diffMs / 60000;
+  if (diffMin <= 10) return 100;
+  if (diffMin <= 20) return 90;
+  if (diffMin <= 30) return 80;
+  if (diffMin <= 40) return 70;
+  if (diffMin <= 50) return 60;
+  return 50;
 }
 
 export default InfiniteStreakGrid;
